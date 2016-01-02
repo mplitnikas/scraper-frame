@@ -1,7 +1,0 @@
-import stuff
-
-set up globals
-
-define result class
-
-
