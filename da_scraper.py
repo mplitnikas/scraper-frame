@@ -1,68 +1,77 @@
 import bs4
 import requests
-import copy
-import time
+import json
 import os
 
-offset_dist = 24	# number of pics that fit into one 'screenful'
-offsets_travel = 1	# go thru this many screens
+offset_dist = 24							# number of pics that fit into one 'screenful'
+offsets_travel = 4							# go thru this many screens
 search_url_base = 'http://www.deviantart.com/browse/all/customization/wallpaper/scenery/?order=9&offset='
 oembed_base = 'http://backend.deviantart.com/oembed?url='
+selector = 'span.shadow a'
+#webbrowser._tryorder = ['firefox'] 			# TODO - change this once we're running on the pi
 
-pic_objects = []
 
-# where do we set up the local storage path??
+try:
+	os.makedirs('deviantart')
+except OSError:
+	pass
 
-class Deviation(object):
-	def __init__(self, json_info):
-		self.json_info = json_info		# the base lump
-		# carve up lump into attributes:
-		# title, author, url, favorites
-		# (who faved, using auth token)(later)
-		# determine & store local path
 
-def get_links():
-	offset = 0
-	for current_offset_batch in range(offsets_travel):
+def get_link_urls(search_term):
+	
+	# this doesn't actually make use of the search term yet
+	link_urls = []
 
-		res = requests.get(search_url_base + str(offset))
+	for current_offset in range(0, (offsets_travel * offset_dist), offset_dist):
+
+		res = requests.get(search_url_base + str(current_offset))
 		res.raise_for_status()
 		soup = bs4.BeautifulSoup(res.text, 'lxml')
 
-		link_objects = soup.select('span.shadow a')
+		link_objects = soup.select(selector)
 
-		# Add title and link to a dict for later
+		# Add title and link to a list for later
 		for elem in link_objects:
 			elem_url = elem.get('href')
-			oembed_url = oembed_base + elem_url
-			oembed_result = requests.get(oembed_url)
+			link_urls.append(elem_url)
 
-			print oembed_url
-			# do request for json info page
-			# create object using json info (what name)
+	return link_urls
 			
 
-		# move to next screenful down
-		offset += offset_dist
+def get_json(link):
+	oembed_url = oembed_base + link
+	oembed_result = requests.get(oembed_url)
+	return oembed_result.text
 
-get_links()
+def get_image_url(link):
+	json_text = json.loads(get_json(link))
 
-# for each link_url get JSON info and parse(for what)
-	# for img url, title, author
-	# can we use classes for the deviation item? (has title, author, link, faves, etc)
-# go thru link urls and download to disk???
+	if 'fullsize_url' in json_text.keys():
+		return json_text['fullsize_url']
+	elif 'url' in json_text.keys():
+		return json_text['url']
+	else:
+		return "\nURL NOT FOUND!!\n"
 
-# generate a scrambled list
+print "Getting search results...",
+hrefs = get_link_urls('dummy search term')
+print "done!"
 
-# ----should this be a diff module?----
+print "Parsing image urls...",
+image_urls = []
+# turn search result urls into direct image urls
+for search_result in hrefs:
+	image_urls.append(get_image_url(search_result))
+print "done!"
 
-# open image in a fullscreen browser??
-# OR
-# display it fullscreen for x seconds w other lib
+# download each image url into created folder
+for image_url in image_urls:
+	print "Downloading image %s..." % image_url,
+	res = requests.get(image_url)
+	res.raise_for_status()
 
-# either way, add title, author, page url to a log
-
-# move to the next image (fade effect)
-
-# consider a pandora/netflix like recommendation system based on other faves
-# https://www.deviantart.com/developers/http/v1/20151202/deviation_whofaved/5ce9c928e5ffa60a7b9790165855aa90
+	imageFile = open(os.path.join('deviantart', os.path.basename(image_url)), 'wb')
+	for chunk in res.iter_content(100000):
+		imageFile.write(chunk)
+	imageFile.close()
+	print "done!"
