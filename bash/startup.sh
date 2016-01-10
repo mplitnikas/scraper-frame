@@ -1,4 +1,4 @@
-cd ~/Desktop/programs/pictureframe
+cd ~/Desktop/programs/scraper-frame
 
 # check wifi connectivity and launch setup wizard
 # todo
