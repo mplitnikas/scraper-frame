@@ -3,16 +3,18 @@ import requests
 import json
 import os
 
+base_folder = 'pictures'
+
+# settings to DL from Deviantart search pages
 offset_dist = 24							# number of pics that fit into one 'screenful'
 offsets_travel = 1							# go thru this many screens
 search_url_base = 'http://www.deviantart.com/browse/all/customization/wallpaper/scenery/?order=9&offset='
 oembed_base = 'http://backend.deviantart.com/oembed?url='
 selector = 'span.shadow a'
-#webbrowser._tryorder = ['firefox'] 			# TODO - change this once we're running on the pi
 
 
 try:
-	os.makedirs('deviantart')
+	os.makedirs(base_folder)
 except OSError:
 	pass
 
@@ -26,9 +28,9 @@ def get_link_urls(search_term):
 
 		res = requests.get(search_url_base + str(current_offset))
 		res.raise_for_status()
-		soup = bs4.BeautifulSoup(res.text)
+		soup = bs4.BeautifulSoup(res.text, 'lxml') # change to 'html5lib' on the pi
 
-		link_objects = soup.select(selector, 'html5lib') 	# this is the parser that the pi runs
+		link_objects = soup.select(selector)
 
 		# Add title and link to a list for later
 		for elem in link_objects:
@@ -60,13 +62,13 @@ print "done!"
 image_urls = []
 # turn search result urls into direct image urls
 for search_result in hrefs:
-	print "Parsing url: %s" % search_result
+	print "Finding image url for: %s" % search_result
 	image_urls.append(get_image_url(search_result))
 
 # download each image url into created folder
 for image_url in image_urls:
 	print "Downloading image %s..." % image_url
-	image_path = os.path.join('deviantart', os.path.basename(image_url))
+	image_path = os.path.join(base_folder, os.path.basename(image_url))
 	
 	if os.path.exists(image_path):
 		print "already exists!"
